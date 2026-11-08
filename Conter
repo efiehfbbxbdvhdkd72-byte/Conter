@@ -1,0 +1,481 @@
+-- Asegurarse de que el juego haya cargado
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+if playerGui:FindFirstChild("TimerScriptGui") then
+    playerGui.TimerScriptGui:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TimerScriptGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = playerGui
+
+local segundosObjetivo = 30
+local tiempoRestante = 30 
+local estaPausado = true 
+local temporizadorActivo = true
+local modoSubir = false
+local factorVelocidad = 1
+
+-- ==================== FUNCIÓN PARA HACER ARRASTRABLE ====================
+local function hacerArrastrable(frame)
+    local arrastrando = false
+    local inputInicio
+    local posicionInicio
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            arrastrando = true
+            inputInicio = input.Position
+            posicionInicio = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    arrastrando = false
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if arrastrando and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - inputInicio
+            frame.Position = UDim2.new(posicionInicio.X.Scale, posicionInicio.X.Offset + delta.X, posicionInicio.Y.Scale, posicionInicio.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- ==================== VENTANA PRINCIPAL (Contador) ====================
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 220, 0, 90)
+mainFrame.Position = UDim2.new(0.5, -110, 0.1, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Parent = screenGui
+
+local cornerMain = Instance.new("UICorner")
+cornerMain.CornerRadius = UDim.new(0, 12)
+cornerMain.Parent = mainFrame
+
+local strokeMain = Instance.new("UIStroke")
+strokeMain.Color = Color3.fromRGB(60, 60, 70)
+strokeMain.Thickness = 2
+strokeMain.Parent = mainFrame
+
+local timerLabel = Instance.new("TextLabel")
+timerLabel.Name = "TimerLabel"
+timerLabel.Size = UDim2.new(1, 0, 0, 45)
+timerLabel.Position = UDim2.new(0, 0, 0, 5)
+timerLabel.BackgroundTransparency = 1
+timerLabel.Font = Enum.Font.GothamBold
+timerLabel.Text = "00:00:30"
+timerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+timerLabel.TextSize = 24
+timerLabel.Parent = mainFrame
+
+local menuButton = Instance.new("TextButton")
+menuButton.Name = "MenuButton"
+menuButton.Size = UDim2.new(0, 180, 0, 28)
+menuButton.Position = UDim2.new(0.5, -90, 0, 52)
+menuButton.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
+menuButton.BorderSizePixel = 0
+menuButton.Font = Enum.Font.GothamSemibold
+menuButton.Text = "Abrir Menú"
+menuButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+menuButton.TextSize = 13
+menuButton.Parent = mainFrame
+
+local cornerBtn = Instance.new("UICorner")
+cornerBtn.CornerRadius = UDim.new(0, 8)
+cornerBtn.Parent = menuButton
+
+hacerArrastrable(mainFrame)
+
+-- ==================== CÍRCULO FLOTANTE ====================
+local floatButton = Instance.new("TextButton")
+floatButton.Name = "FloatButton"
+floatButton.Size = UDim2.new(0, 55, 0, 55)
+floatButton.Position = UDim2.new(0.5, -27, 0.5, -27)
+floatButton.BackgroundColor3 = Color3.fromRGB(120, 120, 130)
+floatButton.Text = "⏱️"
+floatButton.TextSize = 22
+floatButton.Font = Enum.Font.GothamBold
+floatButton.TextColor3 = Color3.fromRGB(255,255,255)
+floatButton.Visible = false
+floatButton.Active = true
+floatButton.Parent = screenGui
+
+local cornerFloat = Instance.new("UICorner")
+cornerFloat.CornerRadius = UDim.new(1, 0)
+cornerFloat.Parent = floatButton
+
+local strokeFloat = Instance.new("UIStroke")
+strokeFloat.Thickness = 4
+strokeFloat.Parent = floatButton
+
+local rainbowGradient = Instance.new("UIGradient")
+rainbowGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+    ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 165, 0)),
+    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 0)),
+    ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 0, 255)),
+    ColorSequenceKeypoint.new(0.83, Color3.fromRGB(128, 0, 128)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+})
+rainbowGradient.Parent = strokeFloat
+
+task.spawn(function()
+    while floatButton.Parent do
+        for i = 0, 360, 2 do
+            rainbowGradient.Rotation = i
+            task.wait(0.03)
+        end
+    end
+end)
+
+hacerArrastrable(floatButton)
+
+-- ==================== MENÚ FLOTANTE DE CONTROL ====================
+local controlMenu = Instance.new("Frame")
+controlMenu.Name = "ControlMenu"
+controlMenu.Size = UDim2.new(0, 220, 0, 290)
+controlMenu.Position = UDim2.new(0.5, -110, 0.1, 100)
+controlMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+controlMenu.BorderSizePixel = 0
+controlMenu.Visible = false
+controlMenu.Active = true
+controlMenu.Parent = screenGui
+
+local cornerMenu = Instance.new("UICorner")
+cornerMenu.CornerRadius = UDim.new(0, 12)
+cornerMenu.Parent = controlMenu
+
+local strokeMenu = Instance.new("UIStroke")
+strokeMenu.Color = Color3.fromRGB(50, 50, 60)
+strokeMenu.Thickness = 2
+strokeMenu.Parent = controlMenu
+
+hacerArrastrable(controlMenu)
+
+-- BOTÓN X ROJO
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 28, 0, 28)
+closeButton.Position = UDim2.new(1, -34, 0, 6)
+closeButton.BackgroundColor3 = Color3.fromRGB(220, 40, 40)
+closeButton.BorderSizePixel = 0
+closeButton.Font = Enum.Font.GothamBold
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextSize = 14
+closeButton.ZIndex = 5
+closeButton.Parent = controlMenu
+
+local cornerClose = Instance.new("UICorner")
+cornerClose.CornerRadius = UDim.new(0, 8)
+cornerClose.Parent = closeButton
+
+local inputTextBox = Instance.new("TextBox")
+inputTextBox.Name = "InputTextBox"
+inputTextBox.Size = UDim2.new(0, 180, 0, 28)
+inputTextBox.Position = UDim2.new(0.5, -90, 0, 42)
+inputTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+inputTextBox.BorderSizePixel = 0
+inputTextBox.Font = Enum.Font.Gotham
+inputTextBox.PlaceholderText = "Segundos objetivo (ej. 30)"
+inputTextBox.Text = "30"
+inputTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+inputTextBox.TextSize = 12
+inputTextBox.ClearTextOnFocus = false
+inputTextBox.Parent = controlMenu
+
+local cornerInput = Instance.new("UICorner")
+cornerInput.CornerRadius = UDim.new(0, 6)
+cornerInput.Parent = inputTextBox
+
+local speedTextBox = Instance.new("TextBox")
+speedTextBox.Name = "SpeedTextBox"
+speedTextBox.Size = UDim2.new(0, 180, 0, 28)
+speedTextBox.Position = UDim2.new(0.5, -90, 0, 76)
+speedTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+speedTextBox.BorderSizePixel = 0
+speedTextBox.Font = Enum.Font.Gotham
+speedTextBox.PlaceholderText = "Velocidad (ej. 1, 10, 50, 100)"
+speedTextBox.Text = "1"
+speedTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedTextBox.TextSize = 12
+speedTextBox.ClearTextOnFocus = false
+speedTextBox.Parent = controlMenu
+
+local cornerSpeed = Instance.new("UICorner")
+cornerSpeed.CornerRadius = UDim.new(0, 6)
+cornerSpeed.Parent = speedTextBox
+
+local sizeTextBox = Instance.new("TextBox")
+sizeTextBox.Name = "SizeTextBox"
+sizeTextBox.Size = UDim2.new(0, 180, 0, 28)
+sizeTextBox.Position = UDim2.new(0.5, -90, 0, 110)
+sizeTextBox.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+sizeTextBox.BorderSizePixel = 0
+sizeTextBox.Font = Enum.Font.Gotham
+sizeTextBox.PlaceholderText = "Tamaño del temporizador (ej. 24)"
+sizeTextBox.Text = "24"
+sizeTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+sizeTextBox.TextSize = 12
+sizeTextBox.ClearTextOnFocus = false
+sizeTextBox.Parent = controlMenu
+
+local cornerSize = Instance.new("UICorner")
+cornerSize.CornerRadius = UDim.new(0, 6)
+cornerSize.Parent = sizeTextBox
+
+local modeButton = Instance.new("TextButton")
+modeButton.Name = "ModeButton"
+modeButton.Size = UDim2.new(0, 180, 0, 28)
+modeButton.Position = UDim2.new(0.5, -90, 0, 144)
+modeButton.BackgroundColor3 = Color3.fromRGB(150, 100, 200)
+modeButton.BorderSizePixel = 0
+modeButton.Font = Enum.Font.GothamSemibold
+modeButton.Text = "Modo: Bajar (Cambiar a Subir)"
+modeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+modeButton.TextSize = 11
+modeButton.Parent = controlMenu
+
+local cornerMode = Instance.new("UICorner")
+cornerMode.CornerRadius = UDim.new(0, 6)
+cornerMode.Parent = modeButton
+
+local actionButton = Instance.new("TextButton")
+actionButton.Name = "ActionButton"
+actionButton.Size = UDim2.new(0, 180, 0, 32)
+actionButton.Position = UDim2.new(0.5, -90, 0, 178)
+actionButton.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+actionButton.BorderSizePixel = 0
+actionButton.Font = Enum.Font.GothamBold
+actionButton.Text = "Play"
+actionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+actionButton.TextSize = 13
+actionButton.Parent = controlMenu
+
+local cornerAction = Instance.new("UICorner")
+cornerAction.CornerRadius = UDim.new(0, 8)
+cornerAction.Parent = actionButton
+
+local setTimeButton = Instance.new("TextButton")
+setTimeButton.Name = "SetTimeButton"
+setTimeButton.Size = UDim2.new(0, 180, 0, 28)
+setTimeButton.Position = UDim2.new(0.5, -90, 0, 216)
+setTimeButton.BackgroundColor3 = Color3.fromRGB(60, 110, 200)
+setTimeButton.BorderSizePixel = 0
+setTimeButton.Font = Enum.Font.GothamSemibold
+setTimeButton.Text = "Aplicar Configuración"
+setTimeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+setTimeButton.TextSize = 12
+setTimeButton.Parent = controlMenu
+
+local cornerSet = Instance.new("UICorner")
+cornerSet.CornerRadius = UDim.new(0, 6)
+cornerSet.Parent = setTimeButton
+
+local applySizeButton = Instance.new("TextButton")
+applySizeButton.Name = "ApplySizeButton"
+applySizeButton.Size = UDim2.new(0, 180, 0, 24)
+applySizeButton.Position = UDim2.new(0.5, -90, 0, 250)
+applySizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+applySizeButton.BorderSizePixel = 0
+applySizeButton.Font = Enum.Font.Gotham
+applySizeButton.Text = "Aplicar Solo Tamaño"
+applySizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+applySizeButton.TextSize = 11
+applySizeButton.Parent = controlMenu
+
+local cornerApplySize = Instance.new("UICorner")
+cornerApplySize.CornerRadius = UDim.new(0, 6)
+cornerApplySize.Parent = applySizeButton
+
+-- ==================== FUNCIONES ====================
+local function formatearTiempo(segundosTotales)
+    local segundosRedondeados = math.floor(segundosTotales + 0.5)
+    local horas = math.floor(segundosRedondeados / 3600)
+    local minutos = math.floor((segundosRedondeados % 3600) / 60)
+    local segundos = segundosRedondeados % 60
+    return string.format("%02d:%02d:%02d", horas, minutos, segundos)
+end
+
+-- NUEVO: El cuadrito cambia de tamaño junto con el texto
+local function aplicarTamano()
+    local nuevoTamano = tonumber(sizeTextBox.Text)
+    if nuevoTamano and nuevoTamano >= 8 and nuevoTamano <= 100 then
+        timerLabel.TextSize = nuevoTamano
+
+        -- Calculamos el tamaño del cuadrito según el tamaño del texto
+        -- Texto chiquito = cuadrito chiquito, texto grande = cuadrito grande
+        local anchoCuadro = math.clamp(nuevoTamano * 6.5 + 60, 140, 420)
+        local altoTexto = nuevoTamano + 18
+        local altoCuadro = altoTexto + 42 -- + espacio del botón "Abrir Menú"
+
+        mainFrame.Size = UDim2.new(0, anchoCuadro, 0, altoCuadro)
+        timerLabel.Size = UDim2.new(1, 0, 0, altoTexto)
+        timerLabel.Position = UDim2.new(0, 0, 0, 4)
+
+        -- El botón de Abrir Menú también se ajusta al nuevo tamaño
+        local anchoBoton = anchoCuadro - 40
+        menuButton.Size = UDim2.new(0, anchoBoton, 0, 28)
+        menuButton.Position = UDim2.new(0.5, -anchoBoton/2, 0, altoTexto + 8)
+    else
+        sizeTextBox.Text = tostring(timerLabel.TextSize)
+    end
+end
+
+tiempoRestante = segundosObjetivo
+timerLabel.Text = formatearTiempo(tiempoRestante)
+
+-- ==================== LÓGICA DE ABRIR / CERRAR ====================
+
+-- Cierra TODO (menú + cuadrito) pero el contador SIGUE corriendo
+local function cerrarTodo()
+    controlMenu.Visible = false
+    mainFrame.Visible = false -- Aquí se oculta el cuadrito del temporizador
+    floatButton.Visible = true
+    menuButton.Text = "Abrir Menú"
+    menuButton.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
+end
+
+-- Reabre TODO (cuadrito + menú)
+local function abrirTodo()
+    mainFrame.Visible = true
+    controlMenu.Visible = true
+    floatButton.Visible = false
+    menuButton.Text = "Cerrar Menú"
+    menuButton.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
+end
+
+-- Solo abre/cierra el menú, sin ocultar el cuadrito
+local function toggleSoloMenu()
+    if controlMenu.Visible then
+        controlMenu.Visible = false
+        menuButton.Text = "Abrir Menú"
+        menuButton.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
+    else
+        controlMenu.Visible = true
+        menuButton.Text = "Cerrar Menú"
+        menuButton.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
+    end
+end
+
+menuButton.MouseButton1Click:Connect(function()
+    toggleSoloMenu()
+end)
+
+-- X ROJA: cierra menú + cuadrito, deja solo el círculo, pero el contador sigue
+closeButton.MouseButton1Click:Connect(function()
+    cerrarTodo()
+end)
+
+-- CÍRCULO: reabre cuadrito + menú
+floatButton.MouseButton1Click:Connect(function()
+    abrirTodo()
+end)
+
+modeButton.MouseButton1Click:Connect(function()
+    modoSubir = not modoSubir
+    if modoSubir then
+        modeButton.Text = "Modo: Subir (Cambiar a Bajar)"
+        tiempoRestante = 0
+    else
+        modeButton.Text = "Modo: Bajar (Cambiar a Subir)"
+        tiempoRestante = segundosObjetivo
+    end
+    timerLabel.Text = formatearTiempo(tiempoRestante)
+    estaPausado = true
+    actionButton.Text = "Play"
+    actionButton.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+end)
+
+actionButton.MouseButton1Click:Connect(function()
+    estaPausado = not estaPausado
+    if estaPausado then
+        actionButton.Text = "Play"
+        actionButton.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+    else
+        actionButton.Text = "Pausar"
+        actionButton.BackgroundColor3 = Color3.fromRGB(220, 80, 80)
+    end
+end)
+
+setTimeButton.MouseButton1Click:Connect(function()
+    local nuevoObjetivo = tonumber(inputTextBox.Text)
+    local nuevaVelocidad = tonumber(speedTextBox.Text)
+    if nuevoObjetivo and nuevoObjetivo >= 0 then
+        segundosObjetivo = nuevoObjetivo
+    end
+    if nuevaVelocidad and nuevaVelocidad > 0 then
+        factorVelocidad = nuevaVelocidad
+    else
+        speedTextBox.Text = tostring(factorVelocidad)
+    end
+    aplicarTamano()
+    if modoSubir then
+        tiempoRestante = 0
+    else
+        tiempoRestante = segundosObjetivo
+    end
+    timerLabel.Text = formatearTiempo(tiempoRestante)
+    estaPausado = true 
+    actionButton.Text = "Play"
+    actionButton.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+end)
+
+applySizeButton.MouseButton1Click:Connect(function()
+    aplicarTamano()
+end)
+
+-- ==================== HILO DEL TEMPORIZADOR ====================
+-- Este hilo NO se detiene aunque ocultes el cuadrito, por eso el contador sigue
+task.spawn(function()
+    local ultimaEjecucion = tick()
+    while temporizadorActivo and screenGui.Parent do
+        task.wait()
+        if not estaPausado then
+            local tiempoActual = tick()
+            local deltaTiempo = tiempoActual - ultimaEjecucion
+            ultimaEjecucion = tiempoActual
+            local avance = deltaTiempo * factorVelocidad
+            if not modoSubir then
+                tiempoRestante = tiempoRestante - avance
+                if tiempoRestante <= 0 then
+                    tiempoRestante = 0
+                    timerLabel.Text = formatearTiempo(0)
+                    estaPausado = true
+                    actionButton.Text = "Play"
+                    actionButton.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+                else
+                    timerLabel.Text = formatearTiempo(tiempoRestante)
+                end
+            else
+                tiempoRestante = tiempoRestante + avance
+                if tiempoRestante >= segundosObjetivo then
+                    tiempoRestante = segundosObjetivo
+                    timerLabel.Text = formatearTiempo(segundosObjetivo)
+                    estaPausado = true
+                    actionButton.Text = "Play"
+                    actionButton.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+                else
+                    timerLabel.Text = formatearTiempo(tiempoRestante)
+                end
+            end
+        else
+            ultimaEjecucion = tick()
+        end
+    end
+end)
